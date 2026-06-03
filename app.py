@@ -1,7 +1,8 @@
 import streamlit as st
 import networkx as nx
 import matplotlib.pyplot as plt
-from engine import MotorRUA
+# Importamos el motor y el dataset real de la UTP desde engine.py
+from engine import MotorRUA, NODOS_UTP, ARISTAS_UTP
 
 # Configuración inicial de la página: título en pestaña del navegador y layout ancho
 st.set_page_config(page_title="RUA - Rutas Universitarias de Auxilio", layout="wide")
@@ -9,24 +10,9 @@ st.set_page_config(page_title="RUA - Rutas Universitarias de Auxilio", layout="w
 st.title("🚨 RUA - Rutas Universitarias de Auxilio")
 st.markdown("Plataforma de Logística Crítica mediante Grafos Ponderados y Algoritmo de Dijkstra.")
 
-# Definición de nodos del campus: lugares clave y edificios principales
-nodos = [
-    "Portería Principal", "Plaza Central", "Bloque Sistemas",
-    "Biblioteca", "Canchas", "Cafetería", "Edificio Administrativo"
-]
-
-# Definición de aristas: conexiones entre nodos con sus pesos (tiempo en minutos)
-aristas_base = [
-    ("Portería Principal", "Plaza Central", 5),
-    ("Portería Principal", "Edificio Administrativo", 4),
-    ("Plaza Central", "Biblioteca", 3),
-    ("Plaza Central", "Canchas", 6),
-    ("Edificio Administrativo", "Bloque Sistemas", 7),
-    ("Bloque Sistemas", "Biblioteca", 4),
-    ("Biblioteca", "Cafetería", 2),
-    ("Canchas", "Cafetería", 5),
-    ("Bloque Sistemas", "Cafetería", 8)
-]
+# Enlazamos las variables locales con el dataset expandido de la UTP (16 nodos)
+nodos = NODOS_UTP
+aristas_base = ARISTAS_UTP
 
 # Crea e inicializa el motor una sola vez para optimizar el rendimiento
 @st.cache_resource
@@ -38,8 +24,10 @@ motor = inicializar_motor()
 # Panel lateral: entrada de usuario para seleccionar origen, destino y bloqueos
 st.sidebar.header("⚙️ Panel de Control de Emergencia")
 
-origen = st.sidebar.selectbox("Punto de Origen (Ingreso):", nodos, index=0)
-destino = st.sidebar.selectbox("Punto de Destino (Incidente):", nodos, index=2)
+# Ordenamos alfabéticamente para que sea más fácil de buscar en la interfaz
+nodos_ordenados = sorted(nodos)
+origen = st.sidebar.selectbox("Punto de Origen (Ingreso):", nodos_ordenados, index=nodos_ordenados.index("Entrada_La_Julita"))
+destino = st.sidebar.selectbox("Punto de Destino (Incidente):", nodos_ordenados, index=nodos_ordenados.index("Bloque_1_Sistemas"))
 
 st.sidebar.markdown("---")
 st.sidebar.subheader("🚧 Gestión de Bloqueos")
@@ -64,21 +52,23 @@ col1, col2 = st.columns([1, 2])
 with col1:
     st.subheader("📊 Resultados de Ruta")
     if ruta_optima:
-        st.success(f"**Tiempo estimado de respuesta:** {tiempo_total} minutos")
+        st.success(f"**Distancia/Esfuerzo estimado:** {tiempo_total} metros")
         st.markdown("**Camino dinámico calculado:**")
         for i, paso in enumerate(ruta_optima):
+            # Formateamos estéticamente reemplazando guiones bajos por espacios
+            nombre_limpio = paso.replace("_", " ")
             if i == 0:
-                st.markdown(f"🟢 **{paso}** (Inicio)")
+                st.markdown(f"🟢 **{nombre_limpio}** (Inicio)")
             elif i == len(ruta_optima) - 1:
-                st.markdown(f"🏁 **{paso}** (Destino)")
+                st.markdown(f"🏁 **{nombre_limpio}** (Destino)")
             else:
-                st.markdown(f"⬇️ {paso}")
+                st.markdown(f"⬇️ {nombre_limpio}")
     else:
         st.error("🚨 **ALERTA CRÍTICA:** No existe una ruta disponible hacia el destino. Todos los accesos viables se encuentran bloqueados.")
 
-# --- 5. RENDERIZADO DEL GRAFO (DIFERENCIACIÓN VISUAL) ---
+# --- RENDERIZADO DEL GRAFO (DIFERENCIACIÓN VISUAL) ---
 with col2:
-    st.subheader("🗺️ Mapa Dinámico del Campus")
+    st.subheader("🗺️ Mapa Dinámico del Campus (UTP)")
 
     # Estructura el grafo con nodos y aristas para visualización
     G = nx.Graph()
@@ -86,11 +76,11 @@ with col2:
     for u, v, w in aristas_base:
         G.add_edge(u, v, weight=w)
 
-    # Calcula posiciones de nodos con semilla fija para mantener el layout consistente
-    pos = nx.spring_layout(G, seed=42)
+    # Calculamos posiciones. Subimos el factor 'k' para dispersar los 16 nodos en el espacio
+    pos = nx.spring_layout(G, k=0.8, seed=42)
 
-    # Configura la figura con fondo oscuro
-    fig, ax = plt.subplots(figsize=(10, 6))
+    # Configura la figura con fondo oscuro (Ampliada a 12x8 para albergar la red de la UTP)
+    fig, ax = plt.subplots(figsize=(12, 8))
     fig.patch.set_facecolor('#0e1117')
     ax.set_facecolor('#0e1117')
 
@@ -110,11 +100,11 @@ with col2:
     edges_normales = [e for e in G.edges() if e not in edges_ruta and e not in edges_bloqueadas_procesadas]
 
     # Dibuja nodos base del grafo
-    nx.draw_networkx_nodes(G, pos, ax=ax, node_color='#1f2937', node_size=2500, edgecolors='#3b82f6', linewidths=2)
+    nx.draw_networkx_nodes(G, pos, ax=ax, node_color='#1f2937', node_size=1800, edgecolors='#3b82f6', linewidths=2)
 
     # Resalta puntos críticos: origen en verde y destino en rojo
-    nx.draw_networkx_nodes(G, pos, nodelist=[origen], ax=ax, node_color='#10b981', node_size=3000)
-    nx.draw_networkx_nodes(G, pos, nodelist=[destino], ax=ax, node_color='#ef4444', node_size=3000)
+    nx.draw_networkx_nodes(G, pos, nodelist=[origen], ax=ax, node_color='#10b981', node_size=2200)
+    nx.draw_networkx_nodes(G, pos, nodelist=[destino], ax=ax, node_color='#ef4444', node_size=2200)
 
     # Dibuja aristas con colores según estado: gris (normal), rojo punteado (bloqueado), azul (ruta)
     nx.draw_networkx_edges(G, pos, ax=ax, edgelist=edges_normales, edge_color='#4b5563', width=2)
@@ -122,10 +112,13 @@ with col2:
     if ruta_optima:
         nx.draw_networkx_edges(G, pos, ax=ax, edgelist=edges_ruta, edge_color='#3b82f6', width=5)
 
-    # Añade etiquetas de nodos y pesos de aristas
-    nx.draw_networkx_labels(G, pos, ax=ax, font_color='white', font_size=9, font_weight='bold')
+    # Añade etiquetas de nodos convirtiendo los nombres internos a formato legible (sin barras bajas)
+    etiquetas_legibles = {nodo: nodo.replace("_", "\n") for nodo in G.nodes()}
+    nx.draw_networkx_labels(G, pos, labels=etiquetas_legibles, ax=ax, font_color='white', font_size=7, font_weight='bold')
+    
+    # Añade los pesos de las aristas (distancias en metros)
     edge_labels = nx.get_edge_attributes(G, 'weight')
-    nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, font_color='#9ca3af', font_size=10, ax=ax)
+    nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, font_color='#9ca3af', font_size=9, ax=ax)
 
     plt.axis('off')
     st.pyplot(fig)
